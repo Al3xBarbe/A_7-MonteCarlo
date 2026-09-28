@@ -1,0 +1,32 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "C: Run",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/MonteCarlo.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "externalConsole": true,
+            "MIMode": "gdb",
+            "miDebuggerPath": "C:\\msys64\\ucrt64\\bin\\gdb.exe",
+            "environment": [
+                {
+                    "name": "PATH",
+                    "value": "C:\\msys64\\ucrt64\\bin;${env:PATH}"
+                }
+            ],
+            "preLaunchTask": "Compilar C"
+        },
+        {
+            "name": "Python: Run",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/plots.py",
+            "console": "externalTerminal",
+            "python": "C:\\Users\\MSI\\anaconda3\\envs\\A5_molec\\python.exe"
+        }
+    ]
+}

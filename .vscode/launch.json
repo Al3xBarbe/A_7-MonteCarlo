@@ -2,15 +2,13 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "C: Run",
+            "name": "Fortran: Run",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/MonteCarlo.exe",
-            "args": [],
-            "cwd": "${workspaceFolder}",
+            "program": "${workspaceFolder}/fortran/Alex.exe",
+            "cwd": "${workspaceFolder}/fortran",
             "stopAtEntry": false,
             "externalConsole": true,
-            "MIMode": "gdb",
             "miDebuggerPath": "C:\\msys64\\ucrt64\\bin\\gdb.exe",
             "environment": [
                 {
@@ -18,13 +16,13 @@
                     "value": "C:\\msys64\\ucrt64\\bin;${env:PATH}"
                 }
             ],
-            "preLaunchTask": "Compilar C"
+            "preLaunchTask": "Compilar Fortran"
         },
         {
             "name": "Python: Run",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/plots.py",
+            "program": "${workspaceFolder}/Py/main.py",
             "console": "externalTerminal",
             "python": "C:\\Users\\MSI\\anaconda3\\envs\\A5_molec\\python.exe"
         }

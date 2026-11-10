@@ -2,24 +2,21 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Compilar C",
+            "label": "Compilar Fortran",
             "type": "process",
-            "command": "C:\\msys64\\ucrt64\\bin\\gcc.exe",
+            "command": "C:\\msys64\\ucrt64\\bin\\gfortran.exe",
             "args": [
                 "-g",
                 "-O0",
-                "-Wall",
-                "-Wextra",
-                "${workspaceFolder}/MonteCarlo.c",
+                "${workspaceFolder}/fortran/Alex.f90",
                 "-o",
-                "${workspaceFolder}/MonteCarlo.exe",
-                "-lm"
+                "${workspaceFolder}/fortran/Alex.exe"
             ],
             "group": {
                 "kind": "build",
                 "isDefault": true
             },
-            "problemMatcher": ["$gcc"]
+            "problemMatcher": []
         }
     ]
 }

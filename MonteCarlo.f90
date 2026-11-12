@@ -184,7 +184,7 @@ program main
     ! Parametros de la simulacion
     integer, parameter :: N = 256
     real(real64), parameter :: T = 0.5_real64
-    integer, parameter :: N_MCS = 500
+    integer, parameter :: N_MCS = 5000
     integer, parameter :: N_RUNS = 200
 
     ! Variables para construir el nombre del fichero

@@ -1,40 +1,47 @@
-!media_error(suma, suma2, n_runs, media, error)
-!metropolis(n, temperatura, n_mcs, n_runs, media_c0, error_c0, media_e, error_e, aceptados, tcpu)
 module simulaciones
    use, intrinsic :: iso_fortran_env, only: real64, int64
    implicit none
 
 contains
-   !Configuracion_1 = patron 1110 (C0(0) = 0.25)
-   !Configuracion_2 = patron 0001 (C0(0) = 0.25)
-   !Configuracion_3 = patron 1010 (C0(0) = 1.00)
-   !Configuracion_4 = patron 0101 (C0(0) = 1.00)
+
+   !---------------------------------------------------------------------------
+   ! Comprobacion de parametros de entrada
+   !---------------------------------------------------------------------------
+   subroutine comprobar(n, temperatura, n_mcs, n_runs)
+      integer, intent(in) :: n, n_mcs, n_runs
+      real(real64), intent(in) :: temperatura
+      if (n < 4 .or. mod(n,4) /= 0) error stop 'N debe ser multiplo de 4 y >= 4'
+      if (temperatura <= 0.0_real64) error stop 'T debe ser positiva'
+      if (n_mcs < 1) error stop 'n_mcs debe ser >= 1'
+      if (n_runs < 2) error stop 'n_runs debe ser >= 2 para calcular errores'
+   end subroutine comprobar
+
+   !---------------------------------------------------------------------------
+   ! Configuraciones iniciales
+   !---------------------------------------------------------------------------
    subroutine configuraciones(n, sigma, texto)
       integer, intent(in) :: n
       integer, allocatable, intent(out) :: sigma(:)
-      character(len=100), intent(in) :: texto
-      integer :: i
-      allocate(sigma(n))
+      character(len=*), intent(in) :: texto
+      if (.not. allocated(sigma)) allocate(sigma(n))
       if (texto == 'Configuracion_1') then
-            sigma = 1
-            sigma(4:n:4) = 0
-      elif (texto == 'Configuracion_2') then
-            sigma = 0
-            sigma(4:n:4) = 1
-      elif (texto == 'Configuracion_3') then
-            sigma = 1
-            sigma(2:n:2) = 0
-      elif (texto == 'Configuracion_4') then
-            sigma = 0
-            sigma(2:n:2) = 1
+         sigma = 1
+         sigma(4:n:4) = 0
+      else if (texto == 'Configuracion_2') then
+         sigma = 0
+         sigma(4:n:4) = 1
+      else if (texto == 'Configuracion_3') then
+         sigma = 1
+         sigma(2:n:2) = 0
+      else if (texto == 'Configuracion_4') then
+         sigma = 0
+         sigma(2:n:2) = 1
       else
-            print *, 'Error: configuracion desconocida'
-            stop
+         error stop 'Error: configuracion desconocida'
       end if
+   end subroutine configuraciones
 
-
-   
-      !---------------------------------------------------------------------------
+   !---------------------------------------------------------------------------
    ! De acumuladores (suma, suma de cuadrados) a media y error estandar
    !---------------------------------------------------------------------------
    subroutine media_error(suma, suma2, n_runs, media, error)
@@ -44,12 +51,11 @@ contains
       real(real64) :: nr
       nr = real(n_runs, real64)
       media = suma / nr
-      error = sqrt((suma2/nr - media**2) / real(n_runs-1, real64))
+      error = sqrt(max(0.0_real64, (suma2/nr - media**2) / real(n_runs-1, real64)))
    end subroutine media_error
 
    !---------------------------------------------------------------------------
    ! Monte Carlo convencional (un intento de flip por paso, con rechazo)
-   ! Salidas: medias y errores de C0 (normalizada) y de la energia por espin
    !---------------------------------------------------------------------------
    subroutine metropolis(n, temperatura, n_mcs, n_runs, media_c0, error_c0, &
                          media_e, error_e, aceptados, tcpu)
@@ -67,7 +73,7 @@ contains
       real(real64) :: suma_e(0:n_mcs), suma_e_cuad(0:n_mcs)
 
       beta = 1.0_real64 / temperatura
-      c0_inicial = 0.25_real64           ! C0(0) para el patron 1110
+      c0_inicial = 0.25_real64
 
       allocate(sigma(n))
       suma_c0 = 0.0_real64; suma_c0_cuad = 0.0_real64
@@ -78,7 +84,6 @@ contains
       do corrida = 1, n_runs
          call configuraciones(n, sigma, 'Configuracion_1')
          do paso = 0, n_mcs
-            ! Medidas en t = paso (MCS)
             energia = -real(sum(sigma), real64) / real(n, real64)
             c0 = 0.0_real64
             do k = 1, n
@@ -95,7 +100,6 @@ contains
 
             if (paso == n_mcs) exit
 
-            ! Un MCS = N intentos
             do intento = 1, n
                call random_number(r)
                i = 1 + int(r * real(n, real64))
@@ -121,7 +125,6 @@ contains
 
    !---------------------------------------------------------------------------
    ! n-fold way (rejection-free). Misma dinamica que metropolis.
-   ! Clases: clase = 1 + 3*sigma + n0  (6 clases), con p = 0.5*n0*exp(-beta*sigma)
    !---------------------------------------------------------------------------
    subroutine nfold(n, temperatura, n_mcs, n_runs, media_c0, error_c0, &
                     media_e, error_e, eventos, tcpu)
@@ -142,6 +145,7 @@ contains
 
       beta = 1.0_real64 / temperatura
       eb = exp(-beta)
+      c0_inicial = 0.25_real64
       p = [0.0_real64, 0.5_real64, 1.0_real64, 0.0_real64, 0.5_real64*eb, eb]
 
       allocate(sigma(n), cls(n), loc(n,6), look(n), nncls(6))
@@ -160,26 +164,24 @@ contains
             csum = csum + real(signo(i)*(1-sigma(i)), real64)
          end do
 
-         t = 0.0_real64          ! tiempo en intentos
-         siguiente = 0           ! siguiente instante de medida (MCS)
+         t = 0.0_real64
+         siguiente = 0
 
          do while (siguiente <= n_mcs)
             w = real(nncls, real64) * p
             q = sum(w) / real(n, real64)
 
-            ! Tiempo (en intentos) hasta el siguiente flip aceptado
             if (q <= 0.0_real64) then
-               tnuevo = huge(1.0_real64)            ! configuracion congelada
+               tnuevo = huge(1.0_real64)
             else if (q >= 1.0_real64) then
                tnuevo = t + 1.0_real64
             else
                call random_number(r)
-               r = 1.0_real64 - r                   ! r en (0,1]
+               r = 1.0_real64 - r
                m = floor(log(r)/log(1.0_real64 - q)) + 1.0_real64
                tnuevo = t + m
             end if
 
-            ! Medir con la configuracion actual todos los instantes que caen antes del salto
             do while (siguiente <= n_mcs)
                if (real(siguiente, real64)*real(n, real64) >= tnuevo) exit
                ev = -esum / real(n, real64)
@@ -192,7 +194,6 @@ contains
             end do
             if (siguiente > n_mcs) exit
 
-            ! Elegir clase con probabilidad proporcional a n_i*p_i
             call random_number(r2)
             objetivo = r2 * sum(w)
             acum = 0.0_real64
@@ -204,7 +205,7 @@ contains
                   exit
                end if
             end do
-            ! Elegir un espin de esa clase
+
             call random_number(r3)
             j = 1 + int(r3 * real(nncls(k), real64))
             if (j > nncls(k)) j = nncls(k)
@@ -212,7 +213,6 @@ contains
             izq = modulo(i-2, n) + 1
             der = modulo(i, n) + 1
 
-            ! Flip y reclasificacion de los 3 espines afectados
             call quitar(i); call quitar(izq); call quitar(der)
             if (sigma(i) == 0) then
                esum = esum + 1.0_real64
@@ -237,13 +237,13 @@ contains
 
    contains
 
-      integer function signo(kk)       ! +1 en posiciones pares, -1 en impares
+      integer function signo(kk)
          integer, intent(in) :: kk
          signo = 1
          if (mod(kk,2) /= 0) signo = -1
       end function signo
 
-      subroutine anadir(s)             ! clasifica el espin s y lo mete en su lista
+      subroutine anadir(s)
          integer, intent(in) :: s
          integer :: n0, cc, l, rr
          l  = modulo(s-2, n) + 1
@@ -256,7 +256,7 @@ contains
          look(s) = nncls(cc)
       end subroutine anadir
 
-      subroutine quitar(s)             ! saca s de su lista (intercambia con el ultimo)
+      subroutine quitar(s)
          integer, intent(in) :: s
          integer :: cc, jj, ultimo
          cc = cls(s)
@@ -270,8 +270,7 @@ contains
    end subroutine nfold
 
    !---------------------------------------------------------------------------
-   ! Evolucion completa: ejecuta metropolis y nfold con los mismos parametros,
-   ! escribe un CSV con ambos y compara resultados y tiempos de CPU.
+   ! Evolucion completa: ejecuta metropolis y nfold y escribe archivo TXT
    !---------------------------------------------------------------------------
    subroutine evolucion_completa(n, temperatura, n_mcs, n_runs, archivo)
       integer, intent(in) :: n, n_mcs, n_runs
@@ -297,18 +296,17 @@ contains
       call nfold(n, temperatura, n_mcs, n_runs, mc0_n, ec0_n, me_n, ee_n, eventos, t_n)
 
       open(newunit=unidad, file=archivo, status='replace', action='write')
-      write(unidad,'(a)') 'mcs,c0_metropolis,err_c0_metropolis,c0_nfold,err_c0_nfold,' // &
-         'c0_teorico,e_metropolis,err_e_metropolis,e_nfold,err_e_nfold,e_equilibrio'
+      write(unidad,'(a)') '# mcs  c0_metropolis  err_c0_metropolis  c0_nfold  err_c0_nfold  ' // &
+         'c0_teorico  e_metropolis  err_e_metropolis  e_nfold  err_e_nfold  e_equilibrio'
 
       max_sig_c0 = 0.0_real64
       max_sig_e = 0.0_real64
       do paso = 0, n_mcs
          c0_teo = exp(-real(paso, real64)*eb)
-         write(unidad,'(i0,10(",",es18.10))') paso, mc0_m(paso), ec0_m(paso), &
+         write(unidad,'(i0,10(2x,es18.10))') paso, mc0_m(paso), ec0_m(paso), &
             mc0_n(paso), ec0_n(paso), c0_teo, me_m(paso), ee_m(paso), &
             me_n(paso), ee_n(paso), e_eq
 
-         ! Diferencia entre metodos en unidades de su error combinado
          dif = abs(mc0_m(paso) - mc0_n(paso))
          sig = sqrt(ec0_m(paso)**2 + ec0_n(paso)**2)
          if (sig > 1.0e-12_real64) max_sig_c0 = max(max_sig_c0, dif/sig)
@@ -328,7 +326,6 @@ contains
       if (t_n > 0.0_real64) print *, 'Aceleracion (CPU metro / CPU nfold) =', t_m/t_n
       print *, 'Max |dif|/error combinado, C0     =', max_sig_c0
       print *, 'Max |dif|/error combinado, E      =', max_sig_e
-      print *, '(valores de unos pocos sigmas indican que ambos metodos coinciden)'
       print *, 'Archivo: ', archivo
 
       deallocate(mc0_m, ec0_m, me_m, ee_m, mc0_n, ec0_n, me_n, ee_n)
@@ -344,7 +341,7 @@ program main
 
    integer, parameter :: N = 256
    real(real64), parameter :: T = 0.5_real64
-   integer, parameter :: N_MCS = 40
+   integer, parameter :: N_MCS = 500
    integer, parameter :: N_RUNS = 200
 
    character(len=20) :: str_N, str_T, str_MCS, str_RUNS
@@ -356,7 +353,7 @@ program main
    write(str_RUNS, '(i0)') N_RUNS
 
    archivo = 'Comparacion_N' // trim(str_N) // '_T' // trim(adjustl(str_T)) // &
-             '_MCS' // trim(str_MCS) // '_R' // trim(str_RUNS) // '.csv'
+             '_MCS' // trim(str_MCS) // '_R' // trim(str_RUNS) // '.txt'
 
    call evolucion_completa(N, T, N_MCS, N_RUNS, trim(archivo))
 end program main
